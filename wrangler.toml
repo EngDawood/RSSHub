@@ -36,10 +36,18 @@ binding = "CACHE"
 # service = "your-playwright-service"
 
 [vars]
+
 # Only use the service binding for this endpoint origin.
 # PLAYWRIGHT_SERVICE_ORIGIN = "https://your-playwright-service.example.com"
 # Environment variables can be set here or via wrangler secret
 # DEBUG_INFO = "false"
+ALLOW_ORIGIN = "*"
+CACHE_CONTENT_EXPIRE = "3600"
+CACHE_EXPIRE = "300"
+DEBUG_INFO = "false"
+REQUEST_RETRY = "2"
+REQUEST_TIMEOUT = "3000"
+# ...
 
 # For production, use wrangler secret put <KEY> to set sensitive values
 # Example secrets:
