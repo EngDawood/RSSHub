@@ -18,6 +18,9 @@ const getCacheTtlKey = (key: string) => {
     return `rsshub:cacheTtl:${key}`;
 };
 
+// Workers KV rejects expirationTtl values below 60 seconds
+export const toKVTtl = (ttl: number) => Math.max(60, Math.ceil(ttl));
+
 export const setKVNamespace = (kv: KVNamespace) => {
     kvNamespace = kv;
     status.available = true;
@@ -39,7 +42,7 @@ export default {
                 // Refresh TTL by re-setting the value
                 // KV doesn't have a native expire refresh, so we need to re-put
                 // Use waitUntil pattern in production for non-blocking refresh
-                await Promise.all([kvNamespace.put(key, value, { expirationTtl: ttl }), cacheTtl ? kvNamespace.put(cacheTtlKey, cacheTtl, { expirationTtl: ttl }) : Promise.resolve()]);
+                await Promise.all([kvNamespace.put(key, value, { expirationTtl: toKVTtl(ttl) }), cacheTtl ? kvNamespace.put(cacheTtlKey, cacheTtl, { expirationTtl: toKVTtl(ttl) }) : Promise.resolve()]);
             }
             return value || '';
         }
@@ -61,11 +64,11 @@ export default {
             return;
         }
 
-        const promises: Array<Promise<void>> = [kvNamespace.put(key, stored, { expirationTtl: maxAge })];
+        const promises: Array<Promise<void>> = [kvNamespace.put(key, stored, { expirationTtl: toKVTtl(maxAge) })];
 
         if (maxAge !== config.cache.contentExpire) {
             // Store the cache ttl if it is not the default value
-            promises.push(kvNamespace.put(getCacheTtlKey(key), String(maxAge), { expirationTtl: maxAge }));
+            promises.push(kvNamespace.put(getCacheTtlKey(key), String(maxAge), { expirationTtl: toKVTtl(maxAge) }));
         }
 
         await Promise.all(promises);

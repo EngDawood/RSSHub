@@ -25,9 +25,10 @@ enabled = true
 [browser]
 binding = "BROWSER"
 
-# KV namespace for caching (auto-provisioned on first deploy)
+# KV namespace for caching (existing "rsshub-cache" namespace)
 [[kv_namespaces]]
 binding = "CACHE"
+id = "419193cf0a7445f3a613fe97a6af9e85"
 
 # PLAYWRIGHT_WS_ENDPOINT takes priority over BROWSER; use a matching Playwright version.
 # Optional service binding when the WebSocket server is another Worker on this account.
