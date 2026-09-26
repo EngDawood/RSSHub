@@ -6,6 +6,7 @@ import undici, { ProxyAgent } from 'undici';
 import { config } from '@/config';
 import ConfigNotFoundError from '@/errors/types/config-not-found';
 import cache from '@/utils/cache';
+import { isWorker } from '@/utils/is-worker';
 import logger from '@/utils/logger';
 import ofetch from '@/utils/ofetch';
 import proxy from '@/utils/proxy';
@@ -17,6 +18,16 @@ export type ApiParams = Record<string, string | number | boolean | undefined>;
 
 let authTokenIndex = 0;
 
+// Workers cannot use undici dispatchers, but their native fetch accepts a `cookie`
+// header, so the jar is applied and updated manually.
+const workerFetch = async (url: string, jar: CookieJar, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    headers.set('cookie', await jar.getCookieString(url));
+    const response = await fetch(url, { ...init, headers });
+    await Promise.all(response.headers.getSetCookie().map((setCookie) => jar.setCookie(setCookie, url, { ignoreError: true })));
+    return response;
+};
+
 const token2Cookie = async (token) => {
     const c = await cache.get(`twitter:cookie:${token}`);
     if (c) {
@@ -25,6 +36,18 @@ const token2Cookie = async (token) => {
     const jar = new CookieJar();
     await jar.setCookie(`auth_token=${token}`, 'https://x.com');
     try {
+        if (isWorker) {
+            const response = await workerFetch(token ? 'https://x.com' : 'https://x.com/narendramodi?mx=2', jar);
+            if (!token) {
+                const gt = (await response.text()).match(/document\.cookie="gt=(\d+)/)?.[1];
+                if (gt) {
+                    jar.setCookieSync(`gt=${gt}`, 'https://x.com');
+                }
+            }
+            const cookie = JSON.stringify(jar.serializeSync());
+            cache.set(`twitter:cookie:${token}`, cookie);
+            return cookie;
+        }
         const agent = proxy.proxyUri
             ? new ProxyAgent({
                   uri: proxy.proxyUri,
@@ -107,17 +130,20 @@ export const twitterGot = async (
     let dispatchers:
         | {
               jar: CookieJar;
-              agent: CookieAgent | ProxyAgent;
+              agent?: CookieAgent | ProxyAgent;
           }
         | undefined;
     if (cookie) {
         logger.debug(`twitter debug: got twitter cookie for token ${auth?.token}`);
         const jar = CookieJar.deserializeSync(JSON.parse(cookie));
-        const agent = proxy.proxyUri
-            ? new ProxyAgent({
-                  uri: proxy.proxyUri,
-              }).compose(HttpCookieAgentCookie({ jar }))
-            : new CookieAgent({ cookies: { jar } });
+        let agent: CookieAgent | ProxyAgent | undefined;
+        if (!isWorker) {
+            agent = proxy.proxyUri
+                ? new ProxyAgent({
+                      uri: proxy.proxyUri,
+                  }).compose(HttpCookieAgentCookie({ jar }))
+                : new CookieAgent({ cookies: { jar } });
+        }
         if (proxy.proxyUri) {
             logger.debug(`twitter debug: Proxying request: ${requestUrl}`);
         }
@@ -152,7 +178,7 @@ export const twitterGot = async (
     // Because undici.fetch is the standard Fetch API and does not support ofetch's
     // `onResponse` callback, the rate-limit and auth error handling that was
     // previously in `onResponse` is now inlined below.
-    const response = await undici.fetch(requestUrl, {
+    const requestInit = {
         headers: {
             authority: 'x.com',
             accept: '*/*',
@@ -174,7 +200,6 @@ export const twitterGot = async (
                       'x-guest-token': jsonCookie.gt,
                   }),
         },
-        dispatcher: dispatchers?.agent,
         ...(usePost && {
             method: 'POST',
             body: JSON.stringify({
@@ -183,7 +208,13 @@ export const twitterGot = async (
                 queryId: options?.queryId,
             }),
         }),
-    });
+    };
+    const response = isWorker
+        ? await workerFetch(requestUrl, dispatchers?.jar ?? new CookieJar(), requestInit)
+        : await undici.fetch(requestUrl, {
+              ...requestInit,
+              dispatcher: dispatchers?.agent,
+          });
 
     let responseData: any;
     try {
