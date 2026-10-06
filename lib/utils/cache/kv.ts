@@ -18,9 +18,6 @@ const getCacheTtlKey = (key: string) => {
     return `rsshub:cacheTtl:${key}`;
 };
 
-// Workers KV rejects expirationTtl values below 60 seconds
-export const toKVTtl = (ttl: number) => Math.max(60, Math.ceil(ttl));
-
 export const setKVNamespace = (kv: KVNamespace) => {
     kvNamespace = kv;
     status.available = true;
