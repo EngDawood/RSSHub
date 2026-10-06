@@ -28,6 +28,10 @@ export const setKVNamespace = (kv: KVNamespace) => {
 
 export const getKVNamespace = () => kvNamespace;
 
+// Workers KV rejects expirationTtl values below 60 seconds
+const KV_MIN_TTL = 60;
+export const toKVTtl = (ttl: number) => Math.max(ttl, KV_MIN_TTL);
+
 export default {
     init: () => {
         // KV namespace is set via setKVNamespace from Worker env binding

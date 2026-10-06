@@ -1,5 +1,6 @@
 import { load } from 'cheerio';
 import { renderToString } from 'hono/jsx/dom/server';
+import { FetchError } from 'ofetch';
 
 import { config } from '@/config';
 import ConfigNotFoundError from '@/errors/types/config-not-found';
@@ -77,8 +78,7 @@ const fetchPage = async (url: string): Promise<string> => {
     try {
         return await ofetch(url);
     } catch (error: unknown) {
-        const { status, statusCode } = error as { status?: number; statusCode?: number };
-        if ((status ?? statusCode) === 403) {
+        if (error instanceof FetchError && error.statusCode === 403) {
             const { page, destroy } = await getPlaywrightPage(url, {
                 onBeforeLoad: async (page) => {
                     const allowedTypes = new Set(['document', 'script', 'xhr', 'fetch']);
@@ -122,11 +122,11 @@ const getTorrentWithCookie = (cache, simples, cookie, limit) => Promise.all(simp
 const parseSimpleDetail = ($ele) => {
     const link = new URL($ele.attr('href'), baseUrl).href;
     const thumb = $ele.children('img');
-    const thumbSrc = thumb.attr('data-src') || thumb.attr('src');
+    const thumbSrc = thumb.attr('src');
     const highResoThumbSrc = thumbSrc
         .replace('thumb', '1')
         .replace(/t(\d+)\.nhentai\.net/, 'i$1.nhentai.net')
-        .replace('.webp.webp', '.webp');
+        .replace(/\.(jpg|png|gif|webp)\.webp$/, '.$1');
     return {
         title: $ele.children('.caption').text(),
         link,
@@ -153,7 +153,7 @@ const getDetail = async (simple) => {
 
     const galleryImgs = $('.gallerythumb img')
         .toArray()
-        .map((ele) => new URL($(ele).attr('data-src')!, baseUrl).href)
+        .map((ele) => new URL($(ele).attr('src')!, baseUrl).href)
         .map((src) => src.replace(/(.+)(\d)t\.(.+)/, (_, p1, p2, p3) => `${p1}${p2}.${p3}`)) // thumb to high-quality
         .map((src) => src.replace(/t(\d+)\.nhentai\.net/, 'i$1.nhentai.net'))
         .map((src) => src.replace(/\.(jpg|png|gif)\.webp$/, '.$1')) // 移除重複的.webp後綴
