@@ -5,6 +5,7 @@ import { trimTrailingSlash } from 'hono/trailing-slash';
 
 import api from '@/api';
 import { errorHandler, notFoundHandler } from '@/errors';
+import { createMcpHandler } from '@/mcp';
 import accessControl from '@/middleware/access-control';
 import antiHotlink from '@/middleware/anti-hotlink';
 import cache from '@/middleware/cache';
@@ -46,6 +47,7 @@ app.use(antiHotlink);
 app.use(parameter);
 app.use(cache);
 
+app.all('/mcp', createMcpHandler(app));
 app.route('/', registry);
 app.route('/api', api);
 
