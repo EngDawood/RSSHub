@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "rsshub": {
+            "type": "http",
+            "url": "${RSSHUB_URL}/mcp",
+            "headers": {
+                "x-api-key": "${RSSHUB_ACCESS_KEY}"
+            }
+        }
+    }
+}
