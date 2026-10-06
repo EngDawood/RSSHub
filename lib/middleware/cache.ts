@@ -6,7 +6,7 @@ import RequestInProgressError from '@/errors/types/request-in-progress';
 import type { Data } from '@/types';
 import cacheModule from '@/utils/cache/index';
 
-const bypassList = new Set(['/', '/robots.txt', '/logo.png', '/favicon.ico']);
+const bypassList = new Set(['/', '/robots.txt', '/logo.png', '/favicon.ico', '/mcp']);
 
 const { h64ToString } = await xxhash();
 // only give cache string, as the `!` condition tricky
